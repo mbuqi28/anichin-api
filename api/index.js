@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
 // Endpoint untuk Latest Donghua (Anichin)
 app.get('/api/latest', async (req, res) => {
     try {
-        const url = 'https://anichin.cafe/';
+        const url = 'https://anichin.watch/#';
         const html = await fetchHTML(url);
         const $ = cheerio.load(html);
         const results = [];
