@@ -39,7 +39,7 @@ app.get('/', (req, res) => {
 app.get('/api/latest', async (req, res) => {
     try {
         // Coba anichin.best terlebih dahulu karena anichin.cafe mungkin dialihkan atau diblokir
-        const baseUrl = 'https://anichin.best/';
+        const baseUrl = 'https://anichin.cafe/';
         const html = await fetchHTML(baseUrl);
         const $ = cheerio.load(html);
         const results = [];
