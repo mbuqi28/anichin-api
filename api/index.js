@@ -150,13 +150,11 @@ app.get('/api/details', async (req, res) => {
     }
 });
 
-// Export untuk Vercel
+// Export untuk Vercel (tetap dipertahankan agar kompatibel)
 module.exports = app;
 
-// Jalankan server jika di lokal (bukan Vercel)
-if (process.env.NODE_ENV !== 'production') {
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
-        console.log(`Server lokal berjalan di http://localhost:${PORT}`);
-    });
-}
+// Jalankan server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server berjalan di port ${PORT}`);
+});
