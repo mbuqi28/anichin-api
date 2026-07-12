@@ -60,20 +60,27 @@ app.get('/api/latest', async (req, res) => {
                 const card = $(el);
                 let title = card.find('.tt').contents().first().text().trim();
                 let episode = card.find('.epxs').text().trim();
-                let image = card.find('img').attr('src') || card.find('img').attr('data-src');
-                let url = card.find('a').attr('href');
+                let image = card.find('img').attr('src') || card.find('img').attr('data-src') || card.find('img').attr('data-lazy-src');
+                let rawUrl = card.find('a').attr('href');
 
                 // Jika title masih kosong, coba alternatif lain
                 if (!title) title = card.find('.title').text().trim();
 
-                // Normalisasi URL: hapus trailing slash dan pastikan lowercase untuk perbandingan
-                if (url) {
-                    url = url.replace(/\/$/, '').toLowerCase();
+                // Buat URL menjadi absolut dan normal
+                let normalizedUrl = '';
+                try {
+                    if (rawUrl) {
+                        normalizedUrl = new URL(rawUrl, baseUrl).href.replace(/\/$/, '').toLowerCase();
+                    }
+                } catch (e) {
+                    normalizedUrl = rawUrl ? rawUrl.replace(/\/$/, '').toLowerCase() : '';
                 }
 
-                // Cek apakah URL sudah pernah diambil (mencegah dobel dari versi Mobile/Desktop web)
-                if (title && url && !seenUrls.has(url)) {
-                    seenUrls.add(url);
+                // Pengecekan Duplikat yang sangat ketat (berdasarkan URL atau Judul)
+                const isDuplicate = seenUrls.has(normalizedUrl) || Array.from(seenUrls).some(u => u.includes(normalizedUrl) || normalizedUrl.includes(u));
+
+                if (title && normalizedUrl && !seenUrls.has(normalizedUrl)) {
+                    seenUrls.add(normalizedUrl);
 
                     // Bersihkan episode dari kata-kata sampah
                     if (episode) {
@@ -84,7 +91,7 @@ app.get('/api/latest', async (req, res) => {
                         title: title,
                         episode: episode,
                         image: image,
-                        url: card.find('a').attr('href') // Simpan URL asli
+                        url: rawUrl // Tetap simpan URL asli untuk navigasi
                     });
                 }
             });
