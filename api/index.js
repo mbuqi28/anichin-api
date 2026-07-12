@@ -54,19 +54,24 @@ app.get('/api/latest', async (req, res) => {
             const results = [];
 
             // Selector yang lebih akurat
-            $('.listupd .bs, .listupd .utao').each((i, el) => {
-                const title = $(el).find('.tt').text().trim() || $(el).find('.title').text().trim();
-                let episode = $(el).find('.epxs').text().trim();
+            $('.listupd .bs').each((i, el) => {
+                const title = $(el).find('.tt').first().text().trim();
+                let episode = $(el).find('.epxs').first().text().trim();
                 let image = $(el).find('img').attr('src') || $(el).find('img').attr('data-src');
-                const url = $(el).find('a').attr('href');
+                let url = $(el).find('a').attr('href');
+
+                // Normalisasi URL untuk pengecekan duplikat
+                if (url && url.endsWith('/')) {
+                    url = url.slice(0, -1);
+                }
 
                 // Membersihkan teks episode jika ada kata berlebih
                 if (episode) {
                     episode = episode.replace(/Episode/g, 'Ep').trim();
                 }
 
-                // Hindari data duplikat berdasarkan URL
-                if (title && url && !results.some(item => item.url === url)) {
+                // Hindari data duplikat berdasarkan URL yang dinormalisasi
+                if (title && url && !results.some(item => item.url.replace(/\/$/, '') === url)) {
                     results.push({ title, episode, image, url });
                 }
             });
