@@ -1,58 +1,53 @@
+const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const cors = require('cors');
 
-module.exports = async (req, res) => {
-  // Mengizinkan aplikasi Android kamu (atau siapa saja) untuk mengakses API ini (CORS)
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
-  res.setHeader('Content-Type', 'application/json');
+const app = express();
 
-  try {
-    const targetUrl = 'https://anichin.cafe/';
-    
-    // 1. Ambil HTML dari web target dengan User-Agent palsu agar tidak langsung diblokir
-    const { data } = await axios.get(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      },
-      timeout: 8000 // Batalkan jika web target tidak merespons dalam 8 detik
+app.use(cors());
+app.use(express.json());
+
+app.get('/', (req, res) => {
+    res.json({
+        message: 'Anichin Scraper API is running on Vercel',
+        endpoints: {
+            latest: '/api/latest',
+            search: '/api/search?q=btth'
+        }
     });
+});
 
-    // 2. Load HTML ke Cheerio untuk diparsing
-    const $ = cheerio.load(data);
-    const updates = [];
+// Contoh Endpoint untuk Latest Donghua (Anichin)
+app.get('/api/latest', async (req, res) => {
+    try {
+        const url = 'https://anichin.vip/'; // Ganti dengan URL Anichin yang aktif
+        const { data } = await axios.get(url);
+        const $ = cheerio.load(data);
+        const results = [];
 
-    // 3. Selektor HTML (Ini disesuaikan dengan struktur tema WordPress/Anime yang dipakai Anichin)
-    // Biasanya menggunakan class '.bs' atau '.listupd .utao'
-    $('.listupd .utao, .localupdates .bs').each((index, element) => {
-      const title = $(element).find('h2, h3').text().trim();
-      const endpointUrl = $(element).find('a').attr('href');
-      const thumbnail = $(element).find('img').attr('src') || $(element).find('img').attr('data-src');
-      const episode = $(element).find('.epx').text().trim() || $(element).find('.eggo').text().trim();
-
-      if (title && endpointUrl) {
-        updates.push({
-          title,
-          episode: episode || 'Updated',
-          thumbnail: thumbnail || '',
-          url: endpointUrl
+        $('.listupd .bs').each((i, el) => {
+            results.push({
+                title: $(el).find('.tt').text().trim(),
+                episode: $(el).find('.epxs').text().trim(),
+                image: $(el).find('img').attr('src'),
+                link: $(el).find('a').attr('href')
+            });
         });
-      }
-    });
 
-    // 4. Kembalikan data dalam bentuk JSON sukses
-    return res.status(200).json({
-      status: true,
-      message: "Success fetch data from Anichin",
-      data: updates
-    });
+        res.json({ success: true, data: results });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
-  } catch (error) {
-    // Jika diblokir Cloudflare atau web down, kembalikan error JSON
-    return res.status(500).json({
-      status: false,
-      message: "Gagal mengambil data. Kemungkinan web terproteksi Cloudflare atau sedang down.",
-      error: error.message
+// Export untuk Vercel
+module.exports = app;
+
+// Jalankan server jika di lokal (bukan Vercel)
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`Server lokal berjalan di http://localhost:${PORT}`);
     });
-  }
-};
+}
