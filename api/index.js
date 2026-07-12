@@ -53,26 +53,39 @@ app.get('/api/latest', async (req, res) => {
             const $ = cheerio.load(html);
             const results = [];
 
-            // Selector yang lebih akurat
+            // Gunakan Set untuk memastikan URL benar-benar unik
+            const seenUrls = new Set();
+
             $('.listupd .bs').each((i, el) => {
-                const title = $(el).find('.tt').first().text().trim();
-                let episode = $(el).find('.epxs').first().text().trim();
-                let image = $(el).find('img').attr('src') || $(el).find('img').attr('data-src');
-                let url = $(el).find('a').attr('href');
+                const card = $(el);
+                let title = card.find('.tt').contents().first().text().trim();
+                let episode = card.find('.epxs').text().trim();
+                let image = card.find('img').attr('src') || card.find('img').attr('data-src');
+                let url = card.find('a').attr('href');
 
-                // Normalisasi URL untuk pengecekan duplikat
-                if (url && url.endsWith('/')) {
-                    url = url.slice(0, -1);
+                // Jika title masih kosong, coba alternatif lain
+                if (!title) title = card.find('.title').text().trim();
+
+                // Normalisasi URL: hapus trailing slash dan pastikan lowercase untuk perbandingan
+                if (url) {
+                    url = url.replace(/\/$/, '').toLowerCase();
                 }
 
-                // Membersihkan teks episode jika ada kata berlebih
-                if (episode) {
-                    episode = episode.replace(/Episode/g, 'Ep').trim();
-                }
+                // Cek apakah URL sudah pernah diambil (mencegah dobel dari versi Mobile/Desktop web)
+                if (title && url && !seenUrls.has(url)) {
+                    seenUrls.add(url);
 
-                // Hindari data duplikat berdasarkan URL yang dinormalisasi
-                if (title && url && !results.some(item => item.url.replace(/\/$/, '') === url)) {
-                    results.push({ title, episode, image, url });
+                    // Bersihkan episode dari kata-kata sampah
+                    if (episode) {
+                        episode = episode.replace(/Episode/g, 'Ep').replace(/Sub.*$/g, 'Sub').trim();
+                    }
+
+                    results.push({
+                        title: title,
+                        episode: episode,
+                        image: image,
+                        url: card.find('a').attr('href') // Simpan URL asli
+                    });
                 }
             });
 
