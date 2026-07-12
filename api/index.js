@@ -12,8 +12,14 @@ app.use(express.json());
 const fetchHTML = async (url) => {
     const { data } = await axios.get(url, {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9,id;q=0.8',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Referer': 'https://www.google.com/'
+        },
+        timeout: 10000 // 10 seconds timeout
     });
     return data;
 };
@@ -24,8 +30,7 @@ app.get('/', (req, res) => {
         endpoints: {
             latest: '/api/latest',
             search: '/api/search?q=btth',
-            details: '/api/details?url=URL_DONGHUA',
-            episode: '/api/episode?url=URL_EPISODE'
+            details: '/api/details?url=URL_DONGHUA'
         }
     });
 });
@@ -33,23 +38,32 @@ app.get('/', (req, res) => {
 // Endpoint untuk Latest Donghua (Anichin)
 app.get('/api/latest', async (req, res) => {
     try {
-        const url = 'https://anichin.watch/#';
-        const html = await fetchHTML(url);
+        // Coba anichin.best terlebih dahulu karena anichin.cafe mungkin dialihkan atau diblokir
+        const baseUrl = 'https://anichin.best/';
+        const html = await fetchHTML(baseUrl);
         const $ = cheerio.load(html);
         const results = [];
 
-        $('.listupd .bs').each((i, el) => {
-            results.push({
-                title: $(el).find('.tt').text().trim(),
-                episode: $(el).find('.epxs').text().trim(),
-                image: $(el).find('img').attr('src'),
-                url: $(el).find('a').attr('href')
-            });
+        // Selector .listupd .bs atau .listupd .utao sering digunakan
+        $('.listupd .bs, .listupd .utao').each((i, el) => {
+            const title = $(el).find('.tt, .title, .entry-title').text().trim();
+            const episode = $(el).find('.epxs, .ep').text().trim();
+            const image = $(el).find('img').attr('src') || $(el).find('img').attr('data-src');
+            const url = $(el).find('a').attr('href');
+
+            if (title && url) {
+                results.push({ title, episode, image, url });
+            }
         });
 
         res.json({ success: true, data: results });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error('Scrape Error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Scrape Failed: ${error.message}`,
+            hint: 'Website target mungkin sedang memblokir request atau domain telah berganti.'
+        });
     }
 });
 
