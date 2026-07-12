@@ -37,34 +37,54 @@ app.get('/', (req, res) => {
 
 // Endpoint untuk Latest Donghua (Anichin)
 app.get('/api/latest', async (req, res) => {
-    try {
-        // Coba anichin.best terlebih dahulu karena anichin.cafe mungkin dialihkan atau diblokir
-        const baseUrl = 'https://anichin.cafe/';
-        const html = await fetchHTML(baseUrl);
-        const $ = cheerio.load(html);
-        const results = [];
+    // Daftar domain untuk dicoba jika satu gagal
+    const domains = [
+        'https://anichin.cafe/',
+        'https://anichin.best/',
+        'https://anichin.live/'
+    ];
 
-        // Selector .listupd .bs atau .listupd .utao sering digunakan
-        $('.listupd .bs, .listupd .utao').each((i, el) => {
-            const title = $(el).find('.tt, .title, .entry-title').text().trim();
-            const episode = $(el).find('.epxs, .ep').text().trim();
-            const image = $(el).find('img').attr('src') || $(el).find('img').attr('data-src');
-            const url = $(el).find('a').attr('href');
+    let lastError = null;
 
-            if (title && url) {
-                results.push({ title, episode, image, url });
+    for (const baseUrl of domains) {
+        try {
+            console.log(`Trying to scrape: ${baseUrl}`);
+            const html = await fetchHTML(baseUrl);
+            const $ = cheerio.load(html);
+            const results = [];
+
+            // Selector yang lebih fleksibel untuk tema WordPress anime
+            $('.listupd .bs, .listupd .utao, .listupd .bsx').each((i, el) => {
+                const title = $(el).find('.tt, .title, .entry-title, h2').text().trim();
+                const episode = $(el).find('.epxs, .ep, .epsub').text().trim();
+                let image = $(el).find('img').attr('src') || $(el).find('img').attr('data-src') || $(el).find('img').attr('data-lazy-src');
+                const url = $(el).find('a').attr('href');
+
+                // Bersihkan URL gambar jika diawali dengan //
+                if (image && image.startsWith('//')) {
+                    image = 'https:' + image;
+                }
+
+                if (title && url) {
+                    results.push({ title, episode, image, url });
+                }
+            });
+
+            if (results.length > 0) {
+                return res.json({ success: true, source: baseUrl, data: results });
             }
-        });
-
-        res.json({ success: true, data: results });
-    } catch (error) {
-        console.error('Scrape Error:', error.message);
-        res.status(500).json({
-            success: false,
-            message: `Scrape Failed: ${error.message}`,
-            hint: 'Website target mungkin sedang memblokir request atau domain telah berganti.'
-        });
+        } catch (error) {
+            console.error(`Failed to scrape ${baseUrl}:`, error.message);
+            lastError = error;
+        }
     }
+
+    // Jika semua domain gagal
+    res.status(500).json({
+        success: false,
+        message: `All sources failed. Last error: ${lastError ? lastError.message : 'Unknown'}`,
+        hint: 'Coba akses https://anichin.team di browser untuk melihat domain yang sedang aktif.'
+    });
 });
 
 // Endpoint untuk Search Donghua
