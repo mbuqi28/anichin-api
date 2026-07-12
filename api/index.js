@@ -53,20 +53,22 @@ app.get('/api/latest', async (req, res) => {
             const $ = cheerio.load(html);
             const results = [];
 
-            // Gunakan Set untuk memastikan URL benar-benar unik
+            // Gunakan Set untuk memastikan data benar-benar unik
             const seenUrls = new Set();
+            const seenTitles = new Set();
 
-            $('.listupd .bs').each((i, el) => {
+            // Hanya ambil dari container listupd pertama (biasanya "Latest Release")
+            // untuk menghindari mengambil bagian "Popular" atau "Featured" yang isinya sama
+            $('.listupd').first().find('.bs').each((i, el) => {
                 const card = $(el);
                 let title = card.find('.tt').contents().first().text().trim();
                 let episode = card.find('.epxs').text().trim();
                 let image = card.find('img').attr('src') || card.find('img').attr('data-src') || card.find('img').attr('data-lazy-src');
                 let rawUrl = card.find('a').attr('href');
 
-                // Jika title masih kosong, coba alternatif lain
                 if (!title) title = card.find('.title').text().trim();
 
-                // Buat URL menjadi absolut dan normal
+                // Normalisasi URL
                 let normalizedUrl = '';
                 try {
                     if (rawUrl) {
@@ -76,13 +78,13 @@ app.get('/api/latest', async (req, res) => {
                     normalizedUrl = rawUrl ? rawUrl.replace(/\/$/, '').toLowerCase() : '';
                 }
 
-                // Pengecekan Duplikat yang sangat ketat (berdasarkan URL atau Judul)
-                const isDuplicate = seenUrls.has(normalizedUrl) || Array.from(seenUrls).some(u => u.includes(normalizedUrl) || normalizedUrl.includes(u));
+                // Cek duplikat berdasarkan URL ATAU Judul
+                const isDuplicate = seenUrls.has(normalizedUrl) || seenTitles.has(title.toLowerCase());
 
-                if (title && normalizedUrl && !seenUrls.has(normalizedUrl)) {
+                if (title && normalizedUrl && !isDuplicate) {
                     seenUrls.add(normalizedUrl);
+                    seenTitles.add(title.toLowerCase());
 
-                    // Bersihkan episode dari kata-kata sampah
                     if (episode) {
                         episode = episode.replace(/Episode/g, 'Ep').replace(/Sub.*$/g, 'Sub').trim();
                     }
@@ -91,7 +93,7 @@ app.get('/api/latest', async (req, res) => {
                         title: title,
                         episode: episode,
                         image: image,
-                        url: rawUrl // Tetap simpan URL asli untuk navigasi
+                        url: rawUrl
                     });
                 }
             });
