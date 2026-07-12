@@ -53,19 +53,20 @@ app.get('/api/latest', async (req, res) => {
             const $ = cheerio.load(html);
             const results = [];
 
-            // Selector yang lebih fleksibel untuk tema WordPress anime
-            $('.listupd .bs, .listupd .utao, .listupd .bsx').each((i, el) => {
-                const title = $(el).find('.tt, .title, .entry-title, h2').text().trim();
-                const episode = $(el).find('.epxs, .ep, .epsub').text().trim();
-                let image = $(el).find('img').attr('src') || $(el).find('img').attr('data-src') || $(el).find('img').attr('data-lazy-src');
+            // Selector yang lebih akurat
+            $('.listupd .bs, .listupd .utao').each((i, el) => {
+                const title = $(el).find('.tt').text().trim() || $(el).find('.title').text().trim();
+                let episode = $(el).find('.epxs').text().trim();
+                let image = $(el).find('img').attr('src') || $(el).find('img').attr('data-src');
                 const url = $(el).find('a').attr('href');
 
-                // Bersihkan URL gambar jika diawali dengan //
-                if (image && image.startsWith('//')) {
-                    image = 'https:' + image;
+                // Membersihkan teks episode jika ada kata berlebih
+                if (episode) {
+                    episode = episode.replace(/Episode/g, 'Ep').trim();
                 }
 
-                if (title && url) {
+                // Hindari data duplikat berdasarkan URL
+                if (title && url && !results.some(item => item.url === url)) {
                     results.push({ title, episode, image, url });
                 }
             });
