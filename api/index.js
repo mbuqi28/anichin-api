@@ -26,7 +26,7 @@ const fetchHTML = async (url) => {
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'Anichin Scraper API is running on Vercel',
+        message: 'Anichin Scraper API is running on Railway',
         endpoints: {
             latest: '/api/latest',
             search: '/api/search?q=btth',
@@ -37,7 +37,6 @@ app.get('/', (req, res) => {
 
 // Endpoint untuk Latest Donghua (Anichin)
 app.get('/api/latest', async (req, res) => {
-    // Daftar domain untuk dicoba jika satu gagal
     const domains = [
         'https://anichin.cafe/',
         'https://anichin.best/',
@@ -53,37 +52,33 @@ app.get('/api/latest', async (req, res) => {
             const $ = cheerio.load(html);
             const results = [];
 
-            // Gunakan Set untuk memastikan data benar-benar unik
-            const seenUrls = new Set();
-            const seenTitles = new Set();
+            // Gunakan Set untuk pelacakan yang sangat ketat
+            const seen = new Set();
 
-            // Hanya ambil dari container listupd pertama (biasanya "Latest Release")
-            // untuk menghindari mengambil bagian "Popular" atau "Featured" yang isinya sama
-            $('.listupd').first().find('.bs').each((i, el) => {
+            // Kita cari container listupd yang spesifik berisi item terbaru
+            $('.listupd .bs').each((i, el) => {
                 const card = $(el);
-                let title = card.find('.tt').contents().first().text().trim();
-                let episode = card.find('.epxs').text().trim();
-                let image = card.find('img').attr('src') || card.find('img').attr('data-src') || card.find('img').attr('data-lazy-src');
-                let rawUrl = card.find('a').attr('href');
 
+                // Ambil judul murni tanpa teks anak (anak biasanya berisi episode/label)
+                let title = card.find('.tt').contents().first().text().trim();
                 if (!title) title = card.find('.title').text().trim();
 
-                // Normalisasi URL
-                let normalizedUrl = '';
-                try {
-                    if (rawUrl) {
-                        normalizedUrl = new URL(rawUrl, baseUrl).href.replace(/\/$/, '').toLowerCase();
-                    }
-                } catch (e) {
-                    normalizedUrl = rawUrl ? rawUrl.replace(/\/$/, '').toLowerCase() : '';
-                }
+                let episode = card.find('.epxs').text().trim();
+                let image = card.find('img').attr('src') || card.find('img').attr('data-src') || card.find('img').attr('data-lazy-src');
+                let url = card.find('a').attr('href');
 
-                // Cek duplikat berdasarkan URL ATAU Judul
-                const isDuplicate = seenUrls.has(normalizedUrl) || seenTitles.has(title.toLowerCase());
+                if (!title || !url) return;
 
-                if (title && normalizedUrl && !isDuplicate) {
-                    seenUrls.add(normalizedUrl);
-                    seenTitles.add(title.toLowerCase());
+                // NORMALISASI UNTUK CEK DUPLIKAT
+                // Kita bersihkan judul agar "Judul Ep 1" dan "Judul" dianggap sama untuk pengecekan
+                const cleanTitle = title.toLowerCase().split(' episode')[0].split(' ep ')[0].trim();
+
+                // Normalisasi URL: ambil slug saja (misal: /anime/judul/)
+                let urlSlug = url.replace(baseUrl, '').replace(/\/$/, '').toLowerCase();
+
+                if (!seen.has(urlSlug) && !seen.has(cleanTitle)) {
+                    seen.add(urlSlug);
+                    seen.add(cleanTitle);
 
                     if (episode) {
                         episode = episode.replace(/Episode/g, 'Ep').replace(/Sub.*$/g, 'Sub').trim();
@@ -93,7 +88,7 @@ app.get('/api/latest', async (req, res) => {
                         title: title,
                         episode: episode,
                         image: image,
-                        url: rawUrl
+                        url: url
                     });
                 }
             });
@@ -107,11 +102,9 @@ app.get('/api/latest', async (req, res) => {
         }
     }
 
-    // Jika semua domain gagal
     res.status(500).json({
         success: false,
-        message: `All sources failed. Last error: ${lastError ? lastError.message : 'Unknown'}`,
-        hint: 'Coba akses https://anichin.team di browser untuk melihat domain yang sedang aktif.'
+        message: `All sources failed. Last error: ${lastError ? lastError.message : 'Unknown'}`
     });
 });
 
@@ -125,15 +118,22 @@ app.get('/api/search', async (req, res) => {
         const html = await fetchHTML(url);
         const $ = cheerio.load(html);
         const results = [];
+        const seen = new Set();
 
         $('.listupd .bs').each((i, el) => {
-            results.push({
-                title: $(el).find('.tt').text().trim(),
-                type: $(el).find('.typez').text().trim(),
-                status: $(el).find('.status').text().trim(),
-                image: $(el).find('img').attr('src'),
-                url: $(el).find('a').attr('href')
-            });
+            const title = $(el).find('.tt').text().trim();
+            const url = $(el).find('a').attr('href');
+
+            if (title && url && !seen.has(url)) {
+                seen.add(url);
+                results.push({
+                    title: title,
+                    type: $(el).find('.typez').text().trim(),
+                    status: $(el).find('.status').text().trim(),
+                    image: $(el).find('img').attr('src'),
+                    url: url
+                });
+            }
         });
 
         res.json({ success: true, data: results });
@@ -178,10 +178,8 @@ app.get('/api/details', async (req, res) => {
     }
 });
 
-// Export untuk Vercel (tetap dipertahankan agar kompatibel)
 module.exports = app;
 
-// Jalankan server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server berjalan di port ${PORT}`);
