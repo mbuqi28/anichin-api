@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
 // Endpoint untuk Latest Donghua (Anichin)
 app.get('/api/latest', async (req, res) => {
     try {
-        const url = 'https://anichin.vip/';
+        const url = 'https://anichin.cafe/';
         const html = await fetchHTML(url);
         const $ = cheerio.load(html);
         const results = [];
@@ -59,7 +59,7 @@ app.get('/api/search', async (req, res) => {
         const query = req.query.q;
         if (!query) return res.status(400).json({ success: false, message: 'Query parameter q is required' });
 
-        const url = `https://anichin.vip/?s=${encodeURIComponent(query)}`;
+        const url = `https://anichin.cafe/?s=${encodeURIComponent(query)}`;
         const html = await fetchHTML(url);
         const $ = cheerio.load(html);
         const results = [];
